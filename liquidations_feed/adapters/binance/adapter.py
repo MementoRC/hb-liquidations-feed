@@ -1,6 +1,7 @@
 """Binance Perpetual Futures liquidation adapter."""
+
 import logging
-from typing import Any, Set, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from liquidations_feed.adapters.binance import constants
 from liquidations_feed.core.adapter_base import BaseAdapter
@@ -29,7 +30,7 @@ class BinancePerpetualAdapter(BaseAdapter):
     def rest_url(self) -> str:
         return constants.REST_URL
 
-    async def subscribe(self, ws: "WSAssistantProtocol", trading_pairs: Set[str]) -> None:
+    async def subscribe(self, ws: "WSAssistantProtocol", trading_pairs: set[str]) -> None:
         if not trading_pairs:
             # Subscribe to all liquidations
             await ws.send({"method": "SUBSCRIBE", "params": ["!forceOrder@arr"], "id": 1})
