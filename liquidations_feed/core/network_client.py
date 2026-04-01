@@ -1,11 +1,12 @@
 """Standalone network client using aiohttp."""
+
 import asyncio
 import json
 import logging
-from typing import Any, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Any
 
 import aiohttp
-
 
 logger = logging.getLogger(__name__)
 

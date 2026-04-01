@@ -1,9 +1,11 @@
 """Unit tests for BinancePerpetualAdapter."""
-import pytest
+
 from unittest.mock import AsyncMock, MagicMock
 
-from liquidations_feed.adapters.binance.adapter import BinancePerpetualAdapter
+import pytest
+
 from liquidations_feed.adapters.binance import constants
+from liquidations_feed.adapters.binance.adapter import BinancePerpetualAdapter
 from liquidations_feed.core.liquidation_data import Liquidation, LiquidationSide
 
 

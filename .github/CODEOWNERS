@@ -1,0 +1,42 @@
+# CODEOWNERS file for hb-liquidations-feed
+# This file defines code ownership and review requirements for different parts of the repository.
+# Users and teams mentioned here will be automatically requested for review when changes are made.
+
+# Default owners for everything in the repo
+* @MementoRC
+
+# Core Components - Critical business logic requiring careful review
+/liquidations_feed/core/ @MementoRC
+/liquidations_feed/integration.py @MementoRC
+
+# Exchange Adapters - Trading infrastructure requiring specialized knowledge
+/liquidations_feed/adapters/ @MementoRC
+/liquidations_feed/adapters/binance/ @MementoRC
+
+# Testing Infrastructure - QA and reliability focus
+/tests/ @MementoRC
+/tests/integration/ @MementoRC
+
+# Mock Resources - Testing and development infrastructure
+/liquidations_feed/mocking_resources/ @MementoRC
+
+# CI/CD and GitHub Workflows - DevOps and automation
+/.github/ @MementoRC
+/.github/workflows/ @MementoRC
+/.github/dependabot.yml @MementoRC
+
+# Configuration Files - Infrastructure and dependency management
+/pyproject.toml @MementoRC
+/pixi.toml @MementoRC
+/pixi.lock @MementoRC
+
+# Documentation - Content and structure review
+/docs/ @MementoRC
+/README.md @MementoRC
+/CHANGELOG.md @MementoRC
+/CONTRIBUTING.md @MementoRC
+
+# Security and Compliance
+/SECURITY.md @MementoRC
+/.github/SECURITY.md @MementoRC
+/.secrets.baseline @MementoRC

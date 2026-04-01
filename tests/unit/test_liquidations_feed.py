@@ -1,4 +1,5 @@
 """Unit tests for LiquidationsFeed."""
+
 import asyncio
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -188,12 +189,8 @@ class TestStartStop:
         cleanup_task.cancel = MagicMock()
 
         # Simulate tasks raising CancelledError on await
-        listen_task.__await__ = lambda self: (
-            (_ for _ in ()).throw(asyncio.CancelledError())
-        )
-        cleanup_task.__await__ = lambda self: (
-            (_ for _ in ()).throw(asyncio.CancelledError())
-        )
+        listen_task.__await__ = lambda self: (_ for _ in ()).throw(asyncio.CancelledError())
+        cleanup_task.__await__ = lambda self: (_ for _ in ()).throw(asyncio.CancelledError())
 
         feed._active = True
         feed._listen_task = listen_task
@@ -202,8 +199,6 @@ class TestStartStop:
         # Patch task awaiting to avoid TypeError
         async def mock_await_task(task):
             raise asyncio.CancelledError()
-
-        original_stop = feed.stop
 
         async def patched_stop():
             feed._active = False
@@ -237,8 +232,7 @@ class TestCleanup:
         cutoff = time.time() - feed._max_retention_seconds
         for pair in list(feed._liquidations.keys()):
             feed._liquidations[pair] = [
-                liq for liq in feed._liquidations[pair]
-                if liq.timestamp > cutoff
+                liq for liq in feed._liquidations[pair] if liq.timestamp > cutoff
             ]
 
         assert len(feed._liquidations["BTC-USDT"]) == 1
@@ -254,8 +248,7 @@ class TestCleanup:
         cutoff = time.time() - feed._max_retention_seconds
         for pair in list(feed._liquidations.keys()):
             feed._liquidations[pair] = [
-                liq for liq in feed._liquidations[pair]
-                if liq.timestamp > cutoff
+                liq for liq in feed._liquidations[pair] if liq.timestamp > cutoff
             ]
 
         assert len(feed._liquidations["ETH-USDT"]) == 5

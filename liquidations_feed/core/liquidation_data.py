@@ -1,4 +1,5 @@
 """Liquidation data types."""
+
 import enum
 from dataclasses import dataclass, fields
 from typing import Optional

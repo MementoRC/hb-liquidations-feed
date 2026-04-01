@@ -1,5 +1,4 @@
 """Drop-in factory replacement matching hummingbot's LiquidationsFactory interface."""
-from typing import Optional, Set
 
 from pydantic import BaseModel
 
@@ -7,17 +6,15 @@ from liquidations_feed.adapters.binance import BinancePerpetualAdapter
 from liquidations_feed.core.liquidations_feed import LiquidationsFeed
 
 
-class UnsupportedConnectorException(Exception):
+class UnsupportedConnectorError(Exception):
     def __init__(self, connector: str):
         supported = list(_CONNECTOR_MAP.keys())
-        super().__init__(
-            f"Connector '{connector}' is not supported. Supported: {supported}"
-        )
+        super().__init__(f"Connector '{connector}' is not supported. Supported: {supported}")
 
 
 class LiquidationsConfig(BaseModel):
     connector: str
-    trading_pairs: Optional[Set[str]] = None
+    trading_pairs: set[str] | None = None
     max_retention_seconds: int = 60
 
 
@@ -31,7 +28,7 @@ class LiquidationsFactory:
     def get_liquidations_feed(cls, config: LiquidationsConfig) -> LiquidationsFeed:
         adapter_cls = _CONNECTOR_MAP.get(config.connector)
         if adapter_cls is None:
-            raise UnsupportedConnectorException(config.connector)
+            raise UnsupportedConnectorError(config.connector)
         adapter = adapter_cls()
         return LiquidationsFeed(
             adapter=adapter,
