@@ -52,6 +52,7 @@ types-setuptools = "*"
 [tool.pixi.feature.quality-extended.dependencies]
 bandit = ">=1.8.0"
 pip-audit = "*"
+filelock = "*"
 
 [tool.pixi.feature.quality-extended.tasks]
 security-scan = "bandit -c pyproject.toml -r liquidations_feed/"
