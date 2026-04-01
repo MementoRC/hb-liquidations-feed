@@ -1,6 +1,5 @@
 """Drop-in factory replacement matching hummingbot's LiquidationsFactory interface."""
 
-
 from pydantic import BaseModel
 
 from liquidations_feed.adapters.binance import BinancePerpetualAdapter

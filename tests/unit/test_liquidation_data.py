@@ -2,8 +2,6 @@
 
 from dataclasses import fields
 
-import pytest
-
 from liquidations_feed.core.liquidation_data import Liquidation, LiquidationSide
 
 
