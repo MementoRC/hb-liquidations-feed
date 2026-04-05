@@ -1,4 +1,5 @@
 """Base adapter interface for exchange-specific liquidation feeds."""
+
 from abc import ABC, abstractmethod
 from typing import Any, Set, TYPE_CHECKING
 

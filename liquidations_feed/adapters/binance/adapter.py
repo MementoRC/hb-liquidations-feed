@@ -1,4 +1,5 @@
 """Binance Perpetual Futures liquidation adapter."""
+
 import logging
 from typing import Any, Set, TYPE_CHECKING
 

@@ -1,4 +1,5 @@
 """Drop-in factory replacement matching hummingbot's LiquidationsFactory interface."""
+
 from typing import Optional, Set
 
 from pydantic import BaseModel
@@ -10,9 +11,7 @@ from liquidations_feed.core.liquidations_feed import LiquidationsFeed
 class UnsupportedConnectorException(Exception):
     def __init__(self, connector: str):
         supported = list(_CONNECTOR_MAP.keys())
-        super().__init__(
-            f"Connector '{connector}' is not supported. Supported: {supported}"
-        )
+        super().__init__(f"Connector '{connector}' is not supported. Supported: {supported}")
 
 
 class LiquidationsConfig(BaseModel):

@@ -1,4 +1,5 @@
 """Unit tests for LiquidationsFactory and LiquidationsConfig."""
+
 import pytest
 
 from liquidations_feed.adapters.binance import BinancePerpetualAdapter

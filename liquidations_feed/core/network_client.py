@@ -1,4 +1,5 @@
 """Standalone network client using aiohttp."""
+
 import asyncio
 import json
 import logging

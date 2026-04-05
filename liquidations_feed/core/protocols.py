@@ -1,4 +1,5 @@
 """Protocol definitions for liquidations feed components."""
+
 from typing import Any, AsyncGenerator, Protocol, runtime_checkable
 
 

@@ -1,4 +1,5 @@
 """Unit tests for liquidation data types."""
+
 import pytest
 from dataclasses import fields
 

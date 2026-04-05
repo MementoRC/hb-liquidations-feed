@@ -1,4 +1,5 @@
 """Main liquidations feed orchestrator."""
+
 import asyncio
 import logging
 import time
@@ -111,8 +112,7 @@ class LiquidationsFeed:
                 cutoff = time.time() - self._max_retention_seconds
                 for pair in list(self._liquidations.keys()):
                     self._liquidations[pair] = [
-                        liq for liq in self._liquidations[pair]
-                        if liq.timestamp > cutoff
+                        liq for liq in self._liquidations[pair] if liq.timestamp > cutoff
                     ]
             except asyncio.CancelledError:
                 raise
