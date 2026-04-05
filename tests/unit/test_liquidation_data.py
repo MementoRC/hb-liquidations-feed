@@ -1,6 +1,5 @@
 """Unit tests for liquidation data types."""
 
-import pytest
 from dataclasses import fields
 
 from liquidations_feed.core.liquidation_data import Liquidation, LiquidationSide

@@ -197,8 +197,6 @@ class TestStartStop:
         async def mock_await_task(task):
             raise asyncio.CancelledError()
 
-        original_stop = feed.stop
-
         async def patched_stop():
             feed._active = False
             for task in [feed._listen_task, feed._cleanup_task]:

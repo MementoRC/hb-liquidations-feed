@@ -7,7 +7,7 @@ from liquidations_feed.core.liquidations_feed import LiquidationsFeed
 from liquidations_feed.hb_compat.factory import (
     LiquidationsConfig,
     LiquidationsFactory,
-    UnsupportedConnectorException,
+    UnsupportedConnectorError,
 )
 
 
@@ -51,14 +51,14 @@ class TestLiquidationsFactory:
 
     def test_unknown_connector_raises(self):
         config = LiquidationsConfig(connector="kraken")
-        with pytest.raises(UnsupportedConnectorException) as exc_info:
+        with pytest.raises(UnsupportedConnectorError) as exc_info:
             LiquidationsFactory.get_liquidations_feed(config)
 
         assert "kraken" in str(exc_info.value)
         assert "binance" in str(exc_info.value)
 
     def test_unsupported_connector_exception_message(self):
-        exc = UnsupportedConnectorException("unknown_exchange")
+        exc = UnsupportedConnectorError("unknown_exchange")
         assert "unknown_exchange" in str(exc)
         assert "binance" in str(exc)
 

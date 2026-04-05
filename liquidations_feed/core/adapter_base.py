@@ -1,7 +1,7 @@
 """Base adapter interface for exchange-specific liquidation feeds."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Set, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from liquidations_feed.core.liquidations_feed import LiquidationsFeed
@@ -22,7 +22,7 @@ class BaseAdapter(ABC):
     def rest_url(self) -> str: ...
 
     @abstractmethod
-    async def subscribe(self, ws: "WSAssistantProtocol", trading_pairs: Set[str]) -> None: ...
+    async def subscribe(self, ws: "WSAssistantProtocol", trading_pairs: set[str]) -> None: ...
 
     @abstractmethod
     def process_message(self, msg: Any, feed: "LiquidationsFeed") -> None: ...

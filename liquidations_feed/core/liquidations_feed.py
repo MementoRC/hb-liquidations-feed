@@ -1,17 +1,16 @@
 """Main liquidations feed orchestrator."""
 
 import asyncio
+import contextlib
 import logging
 import time
 from collections import defaultdict
-from typing import Dict, List, Optional, Set
 
 import pandas as pd
 
 from liquidations_feed.core.liquidation_data import Liquidation, LiquidationSide, fields
 from liquidations_feed.core.network_client import NetworkClient
 from liquidations_feed.core.protocols import NetworkClientProtocol
-
 
 logger = logging.getLogger(__name__)
 
@@ -25,17 +24,17 @@ class LiquidationsFeed:
     def __init__(
         self,
         adapter,
-        trading_pairs: Optional[Set[str]] = None,
+        trading_pairs: set[str] | None = None,
         max_retention_seconds: int = 60,
-        network_client: Optional[NetworkClientProtocol] = None,
+        network_client: NetworkClientProtocol | None = None,
     ):
         self._adapter = adapter
         self._trading_pairs = trading_pairs or set()
         self._max_retention_seconds = max_retention_seconds
         self._network_client = network_client or NetworkClient()
-        self._liquidations: Dict[str, List[Liquidation]] = defaultdict(list)
-        self._listen_task: Optional[asyncio.Task] = None
-        self._cleanup_task: Optional[asyncio.Task] = None
+        self._liquidations: dict[str, list[Liquidation]] = defaultdict(list)
+        self._listen_task: asyncio.Task | None = None
+        self._cleanup_task: asyncio.Task | None = None
         self._subscribed: bool = False
         self._active: bool = False
 
@@ -48,13 +47,13 @@ class LiquidationsFeed:
         return self._subscribed
 
     @property
-    def trading_pairs(self) -> Set[str]:
+    def trading_pairs(self) -> set[str]:
         return self._trading_pairs
 
     def add_liquidation(self, trading_pair: str, liquidation: Liquidation):
         self._liquidations[trading_pair].append(liquidation)
 
-    def liquidations_df(self, trading_pair: Optional[str] = None) -> pd.DataFrame:
+    def liquidations_df(self, trading_pair: str | None = None) -> pd.DataFrame:
         if trading_pair:
             data = self._liquidations.get(trading_pair, [])
         else:
@@ -76,10 +75,8 @@ class LiquidationsFeed:
         for task in [self._listen_task, self._cleanup_task]:
             if task and not task.done():
                 task.cancel()
-                try:
+                with contextlib.suppress(asyncio.CancelledError):
                     await task
-                except asyncio.CancelledError:
-                    pass
         await self._network_client.close()
         logger.info(f"Stopped {self.name} liquidations feed")
 
