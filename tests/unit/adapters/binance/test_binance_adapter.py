@@ -57,7 +57,6 @@ class TestBinancePerpetualAdapterProperties:
 
 
 class TestBinancePerpetualAdapterSubscribe:
-    @pytest.mark.asyncio
     async def test_subscribe_all_pairs(self):
         adapter = _make_adapter()
         ws = AsyncMock()
@@ -69,7 +68,6 @@ class TestBinancePerpetualAdapterSubscribe:
         assert call_args["method"] == "SUBSCRIBE"
         assert "!forceOrder@arr" in call_args["params"]
 
-    @pytest.mark.asyncio
     async def test_subscribe_specific_pairs(self):
         adapter = _make_adapter()
         ws = AsyncMock()
@@ -86,7 +84,6 @@ class TestBinancePerpetualAdapterSubscribe:
         assert any("ethusdt" in p for p in params)
         assert all("@forceOrder" in p for p in params)
 
-    @pytest.mark.asyncio
     async def test_subscribe_specific_pairs_fallback(self):
         """When trading pair map is empty, falls back to removing dash."""
         adapter = _make_adapter()

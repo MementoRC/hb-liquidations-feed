@@ -137,7 +137,6 @@ class TestReadyProperty:
 
 
 class TestStartStop:
-    @pytest.mark.asyncio
     async def test_start_creates_tasks(self):
         feed, _, _ = _make_feed()
 
@@ -157,7 +156,6 @@ class TestStartStop:
         assert feed._active is True
         assert len(created_tasks) == 2
 
-    @pytest.mark.asyncio
     async def test_start_idempotent(self):
         feed, _, _ = _make_feed()
 
@@ -176,7 +174,6 @@ class TestStartStop:
 
         assert call_count[0] == 2  # only from first start()
 
-    @pytest.mark.asyncio
     async def test_stop_cancels_tasks(self):
         feed, _, network_client = _make_feed()
 
