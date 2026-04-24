@@ -15,7 +15,6 @@ permissions: read-all
 
 jobs:
   ci:
-    # Pinned to v2.9.3: eliminates security-events:write requirement
     uses: Claire-s-Monster/ci-framework/.github/workflows/reusable-ci.yml@2522512f769d04c4ca547bcd5071cb439d71be17 # v2.9.3
     permissions:
       contents: write
@@ -23,7 +22,7 @@ jobs:
       pull-requests: write
       actions: read
       checks: write
-    secrets: inherit
+      security-events: write
     with:
       pixi-environment: "ci"
       python-versions: '["3.10", "3.11", "3.12"]'
