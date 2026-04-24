@@ -23,6 +23,7 @@ jobs:
       actions: read
       checks: write
       security-events: write
+    secrets: inherit
     with:
       pixi-environment: "ci"
       python-versions: '["3.10", "3.11", "3.12"]'
