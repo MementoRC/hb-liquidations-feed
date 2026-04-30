@@ -1,7 +1,7 @@
 """Binance Perpetual Futures liquidation adapter."""
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 from liquidations_feed.adapters.binance import constants
 from liquidations_feed.core.adapter_base import BaseAdapter
@@ -18,18 +18,22 @@ class BinancePerpetualAdapter(BaseAdapter):
     def __init__(self):
         self._trading_pair_map: dict = {}
 
+    @override
     @property
     def name(self) -> str:
         return "binance_perpetual"
 
+    @override
     @property
     def wss_url(self) -> str:
         return constants.WSS_URL
 
+    @override
     @property
     def rest_url(self) -> str:
         return constants.REST_URL
 
+    @override
     async def subscribe(self, ws: "WSAssistantProtocol", trading_pairs: set[str]) -> None:
         if not trading_pairs:
             # Subscribe to all liquidations
@@ -44,6 +48,7 @@ class BinancePerpetualAdapter(BaseAdapter):
             if streams:
                 await ws.send({"method": "SUBSCRIBE", "params": streams, "id": 1})
 
+    @override
     def process_message(self, msg: Any, feed: "LiquidationsFeed") -> None:
         if not isinstance(msg, dict):
             return
@@ -74,6 +79,7 @@ class BinancePerpetualAdapter(BaseAdapter):
         except (KeyError, ValueError) as e:
             logger.error(f"Error processing liquidation message: {e}")
 
+    @override
     async def fetch_trading_pair_map(self, network_client) -> dict:
         url = f"{self.rest_url}{constants.EXCHANGE_INFO_ENDPOINT}"
         data = await network_client.rest_get(url)
