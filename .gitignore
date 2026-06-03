@@ -11,3 +11,6 @@ build/
 .coverage
 coverage.xml
 htmlcov/
+
+# Git worktrees (per submodule worktree workflow)
+.worktrees/
