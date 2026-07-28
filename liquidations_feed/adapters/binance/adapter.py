@@ -1,17 +1,17 @@
 """Binance Perpetual Futures liquidation adapter."""
 
-import logging
 from typing import TYPE_CHECKING, Any, override
 
 from liquidations_feed.adapters.binance import constants
 from liquidations_feed.core.adapter_base import BaseAdapter
 from liquidations_feed.core.liquidation_data import Liquidation, LiquidationSide
+from liquidations_feed.hb_compat.common import get_logger
 
 if TYPE_CHECKING:
     from liquidations_feed.core.liquidations_feed import LiquidationsFeed
     from liquidations_feed.core.protocols import WSAssistantProtocol
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class BinancePerpetualAdapter(BaseAdapter):

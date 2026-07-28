@@ -2,7 +2,6 @@
 
 import asyncio
 import contextlib
-import logging
 import time
 from collections import defaultdict
 
@@ -11,8 +10,9 @@ import pandas as pd
 from liquidations_feed.core.liquidation_data import Liquidation, LiquidationSide, fields
 from liquidations_feed.core.network_client import NetworkClient
 from liquidations_feed.core.protocols import NetworkClientProtocol
+from liquidations_feed.hb_compat.common import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class LiquidationsFeed:

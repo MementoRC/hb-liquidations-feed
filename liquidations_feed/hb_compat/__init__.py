@@ -6,9 +6,11 @@ Provides drop-in replacements for:
 - LiquidationsBase (hummingbot.data_feed.liquidations_feed.liquidations_base)
 """
 
+from liquidations_feed.hb_compat.common import get_logger
 from liquidations_feed.hb_compat.factory import LiquidationsConfig, LiquidationsFactory
 
 __all__ = [
     "LiquidationsFactory",
     "LiquidationsConfig",
+    "get_logger",
 ]
