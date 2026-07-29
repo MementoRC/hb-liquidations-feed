@@ -2,13 +2,14 @@
 
 import asyncio
 import json
-import logging
 from collections.abc import AsyncGenerator
 from typing import Any
 
 import aiohttp
 
-logger = logging.getLogger(__name__)
+from liquidations_feed.hb_compat.common import get_logger
+
+logger = get_logger(__name__)
 
 
 class WSAssistant:
