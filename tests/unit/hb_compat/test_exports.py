@@ -14,6 +14,7 @@ from liquidations_feed.hb_compat.factory import (
 EXPECTED = [
     "Liquidation",
     "LiquidationSide",
+    "LiquidationsBase",
     "LiquidationsConfig",
     "LiquidationsFactory",
     "UnsupportedConnectorException",
