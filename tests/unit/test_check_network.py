@@ -11,6 +11,7 @@ from aioresponses import aioresponses
 from liquidations_feed.adapters.binance import BinancePerpetualAdapter, constants
 from liquidations_feed.core.liquidations_feed import LiquidationsFeed
 from liquidations_feed.core.network_client import NetworkClient
+from liquidations_feed.core.protocols import ThrottlerProtocol
 from liquidations_feed.core.throttler import AsyncThrottler
 from liquidations_feed.hb_compat import LiquidationsBase, NetworkStatus
 
@@ -22,9 +23,28 @@ class RecordingThrottler:
         self.calls: list[str] = []
 
     @asynccontextmanager
-    async def execute_task(self, limit_id, weight=None):
+    async def execute_task(self, limit_id):
         self.calls.append(limit_id)
         yield
+
+
+class HummingbotShapedThrottler:
+    """Stub with hummingbot's exact AsyncThrottler.execute_task(limit_id) shape."""
+
+    def __init__(self):
+        self.calls: list[str] = []
+
+    def execute_task(self, limit_id: str):
+        self.calls.append(limit_id)
+        return _NullContext()
+
+
+class _NullContext:
+    async def __aenter__(self):
+        return None
+
+    async def __aexit__(self, *exc):
+        return None
 
 
 async def test_rest_get_uses_throttler_when_limit_id_given():
@@ -61,13 +81,14 @@ async def test_exchange_info_fetch_is_throttled_under_its_endpoint_id():
     client = MagicMock()
     client.rest_get = AsyncMock(return_value={"symbols": []})
     await adapter.fetch_trading_pair_map(client)
-    assert client.rest_get.await_args.kwargs["limit_id"] == constants.EXCHANGE_INFO_ENDPOINT
+    assert client.rest_get.await_args.kwargs["limit_id"] == "v1/exchangeInfo"
+    assert client.rest_get.await_args.args[0].endswith(constants.EXCHANGE_INFO_ENDPOINT)
 
 
 def test_binance_adapter_exposes_health_check_and_limits():
     adapter = BinancePerpetualAdapter()
     assert adapter.health_check_url == PING_URL
-    assert adapter.health_check_limit_id == constants.HEALTH_CHECK_ENDPOINT
+    assert adapter.health_check_limit_id == "v1/ping"
     assert adapter.rate_limits is constants.RATE_LIMITS
 
 
@@ -89,7 +110,18 @@ def _feed_with_client(client):
 async def test_feed_check_network_pings_health_endpoint_with_limit_id():
     client = AsyncMock()
     assert await _feed_with_client(client).check_network() is True
-    client.rest_get.assert_awaited_once_with(PING_URL, limit_id=constants.HEALTH_CHECK_ENDPOINT)
+    client.rest_get.assert_awaited_once_with(PING_URL, limit_id="v1/ping")
+
+
+async def test_hummingbot_shaped_throttler_satisfies_protocol_and_gets_ping_id():
+    throttler = HummingbotShapedThrottler()
+    assert isinstance(throttler, ThrottlerProtocol)
+    feed = LiquidationsFeed(adapter=BinancePerpetualAdapter(), throttler=throttler)
+    with aioresponses() as mocked:
+        mocked.get(PING_URL, payload={})
+        assert await feed.check_network() is True
+    await feed.stop()
+    assert throttler.calls == ["v1/ping"]
 
 
 async def test_feed_check_network_false_on_failure():

@@ -27,6 +27,7 @@ class RateLimit:
     limit_id: str
     limit: int
     time_interval: float
+    weight: int = 1
     linked_limits: tuple[LinkedLimitWeightPair, ...] = ()
 
 
@@ -46,14 +47,14 @@ class AsyncThrottler:
         self._lock = asyncio.Lock()
 
     @asynccontextmanager
-    async def execute_task(self, limit_id: str, weight: int | None = None) -> AsyncIterator[None]:
-        await self._acquire(limit_id, 1 if weight is None else weight)
+    async def execute_task(self, limit_id: str) -> AsyncIterator[None]:
+        await self._acquire(limit_id)
         yield
 
-    async def _acquire(self, limit_id: str, weight: int) -> None:
+    async def _acquire(self, limit_id: str) -> None:
         if limit_id not in self._limits:
             raise ValueError(f"Unknown rate limit id: {limit_id!r}")
-        charges = [(limit_id, weight)]
+        charges = [(limit_id, self._limits[limit_id].weight)]
         charges += [(p.limit_id, p.weight) for p in self._limits[limit_id].linked_limits]
         for lid, w in charges:
             if w > self._limits[lid].limit:

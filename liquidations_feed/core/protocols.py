@@ -13,9 +13,7 @@ class ThrottlerProtocol(Protocol):
     configured with those limits.
     """
 
-    def execute_task(
-        self, limit_id: str, weight: int | None = None
-    ) -> AbstractAsyncContextManager[None]: ...
+    def execute_task(self, limit_id: str) -> AbstractAsyncContextManager[None]: ...
 
 
 @runtime_checkable

@@ -5,6 +5,10 @@ from liquidations_feed.core.throttler import LinkedLimitWeightPair, RateLimit
 REST_URL = "https://fapi.binance.com"
 HEALTH_CHECK_ENDPOINT = "/fapi/v1/ping"
 EXCHANGE_INFO_ENDPOINT = "/fapi/v1/exchangeInfo"
+# Throttler limit ids deliberately mirror hummingbot's binance_perpetual_constants (PING_URL,
+# EXCHANGE_INFO_URL) so an injected host AsyncThrottler applies its own limits.
+HEALTH_CHECK_LIMIT_ID = "v1/ping"
+EXCHANGE_INFO_LIMIT_ID = "v1/exchangeInfo"
 # Combined-stream route: every frame is wrapped as {"stream": ..., "data": {...}}.
 WSS_URL = "wss://fstream.binance.com/market/stream"
 
@@ -24,13 +28,13 @@ EXCHANGE_INFO_WEIGHT = 40
 RATE_LIMITS = [
     RateLimit(REQUEST_WEIGHT, REQUEST_WEIGHT_LIMIT, REQUEST_WEIGHT_INTERVAL_SECONDS),
     RateLimit(
-        HEALTH_CHECK_ENDPOINT,
+        HEALTH_CHECK_LIMIT_ID,
         REQUEST_WEIGHT_LIMIT,
         REQUEST_WEIGHT_INTERVAL_SECONDS,
         linked_limits=(LinkedLimitWeightPair(REQUEST_WEIGHT, PING_WEIGHT),),
     ),
     RateLimit(
-        EXCHANGE_INFO_ENDPOINT,
+        EXCHANGE_INFO_LIMIT_ID,
         REQUEST_WEIGHT_LIMIT,
         REQUEST_WEIGHT_INTERVAL_SECONDS,
         linked_limits=(LinkedLimitWeightPair(REQUEST_WEIGHT, EXCHANGE_INFO_WEIGHT),),
