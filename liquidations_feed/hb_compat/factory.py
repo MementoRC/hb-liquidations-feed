@@ -22,6 +22,10 @@ class UnsupportedConnectorError(Exception):
         )
 
 
+# Upstream hummingbot name for the same exception.
+UnsupportedConnectorException = UnsupportedConnectorError
+
+
 class LiquidationsConfig(BaseModel):
     connector: str
     trading_pairs: set[str] | None = None
