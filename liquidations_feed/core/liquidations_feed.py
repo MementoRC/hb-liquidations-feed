@@ -2,8 +2,10 @@
 
 import asyncio
 import contextlib
+import random
 import time
 from collections import defaultdict
+from collections.abc import Callable
 
 import pandas as pd
 
@@ -27,11 +29,23 @@ class LiquidationsFeed:
         trading_pairs: set[str] | None = None,
         max_retention_seconds: int = 60,
         network_client: NetworkClientProtocol | None = None,
+        cleanup_interval_seconds: float | None = None,
+        reconnect_delay_seconds: float = 1.0,
+        reconnect_max_delay_seconds: float = 30.0,
+        rng: Callable[[float, float], float] = random.uniform,
     ):
         self._adapter = adapter
         self._trading_pairs = trading_pairs or set()
         self._max_retention_seconds = max_retention_seconds
         self._network_client = network_client or NetworkClient()
+        self._cleanup_interval_seconds = (
+            cleanup_interval_seconds
+            if cleanup_interval_seconds is not None
+            else max_retention_seconds / 2
+        )
+        self._reconnect_delay_seconds = reconnect_delay_seconds
+        self._reconnect_max_delay_seconds = reconnect_max_delay_seconds
+        self._rng = rng
         self._liquidations: dict[str, list[Liquidation]] = defaultdict(list)
         self._listen_task: asyncio.Task | None = None
         self._cleanup_task: asyncio.Task | None = None
@@ -58,6 +72,8 @@ class LiquidationsFeed:
             data = self._liquidations.get(trading_pair, [])
         else:
             data = [liq for liq_list in self._liquidations.values() for liq in liq_list]
+        cutoff = time.time() - self._max_retention_seconds
+        data = [liq for liq in data if liq.timestamp > cutoff]
         if not data:
             return pd.DataFrame(columns=[f.name for f in fields(Liquidation)])
         return pd.DataFrame([vars(liq) for liq in data])
@@ -87,12 +103,14 @@ class LiquidationsFeed:
         logger.info(f"Stopped {self.name} liquidations feed")
 
     async def _listen_loop(self) -> None:
+        attempt = 0
         while self._active:
             try:
                 ws = await self._network_client.ws_connect(self._adapter.wss_url)
                 try:
                     await self._adapter.subscribe(ws, self._trading_pairs)
                     self._subscribed = True
+                    attempt = 0
                     async for msg in ws.iter_messages():
                         if not self._active:
                             break
@@ -102,16 +120,25 @@ class LiquidationsFeed:
                     self._subscribed = False
             except asyncio.CancelledError:
                 raise
+            except ConnectionError as e:
+                logger.warning(f"Connection error in liquidations listen loop: {e}")
+                attempt = await self._backoff(attempt)
             except Exception as e:
                 logger.error(f"Error in liquidations listen loop: {e}")
-                self._subscribed = False
-                if self._active:
-                    await asyncio.sleep(5)
+                attempt = await self._backoff(attempt)
+
+    async def _backoff(self, attempt: int) -> int:
+        """Sleep with exponential backoff and full jitter; return the next attempt number."""
+        self._subscribed = False
+        if self._active:
+            cap = min(self._reconnect_max_delay_seconds, self._reconnect_delay_seconds * 2**attempt)
+            await asyncio.sleep(self._rng(0, cap))
+        return attempt + 1
 
     async def _cleanup_loop(self) -> None:
         while self._active:
             try:
-                await asyncio.sleep(self._max_retention_seconds / 2)
+                await asyncio.sleep(self._cleanup_interval_seconds)
                 cutoff = time.time() - self._max_retention_seconds
                 for pair in list(self._liquidations.keys()):
                     self._liquidations[pair] = [

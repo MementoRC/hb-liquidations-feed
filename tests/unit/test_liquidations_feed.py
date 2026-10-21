@@ -11,7 +11,7 @@ from liquidations_feed.core.liquidation_data import Liquidation, LiquidationSide
 from liquidations_feed.core.liquidations_feed import LiquidationsFeed
 
 
-def _make_feed(trading_pairs=None, max_retention_seconds=60):
+def _make_feed(trading_pairs=None, max_retention_seconds=60, **kwargs):
     adapter = MagicMock()
     adapter.name = "test_exchange"
     adapter.fetch_trading_pair_map = AsyncMock(return_value={"BTCUSDT": "BTC-USDT"})
@@ -21,6 +21,7 @@ def _make_feed(trading_pairs=None, max_retention_seconds=60):
         trading_pairs=trading_pairs,
         max_retention_seconds=max_retention_seconds,
         network_client=network_client,
+        **kwargs,
     )
     return feed, adapter, network_client
 
@@ -112,6 +113,16 @@ class TestLiquidationsDf:
         df = feed.liquidations_df(trading_pair="BTC-USDT")
         assert len(df) == 2
         assert all(df["trading_pair"] == "BTC-USDT")
+
+    def test_liquidations_df_excludes_expired_without_cleanup(self):
+        feed, _, _ = _make_feed(max_retention_seconds=60)
+        expired = _make_liquidation("BTC-USDT", timestamp=time.time() - 120)
+        fresh = _make_liquidation("BTC-USDT", timestamp=time.time() - 5)
+        feed.add_liquidation("BTC-USDT", expired)
+        feed.add_liquidation("BTC-USDT", fresh)
+
+        assert len(feed.liquidations_df()) == 1
+        assert len(feed.liquidations_df(trading_pair="BTC-USDT")) == 1
 
     def test_liquidations_df_filtered_pair_not_present(self):
         feed, _, _ = _make_feed()
@@ -273,6 +284,134 @@ class TestStartStop:
         listen_task.cancel.assert_called_once()
         cleanup_task.cancel.assert_called_once()
         network_client.close.assert_called_once()
+
+
+def _stop_after_sleeps(feed, count=1):
+    """Return an asyncio.sleep stand-in that records delays and deactivates the feed."""
+    sleep = AsyncMock()
+
+    async def _side_effect(delay):
+        if sleep.call_count >= count:
+            feed._active = False
+
+    sleep.side_effect = _side_effect
+    return sleep
+
+
+def _delays(sleep):
+    return [c.args[0] for c in sleep.call_args_list]
+
+
+def _upper_bound(low, high):
+    return high
+
+
+class TestTiming:
+    async def test_default_cleanup_interval_is_half_retention(self):
+        feed, _, _ = _make_feed(max_retention_seconds=60)
+        feed._active = True
+        sleep = _stop_after_sleeps(feed)
+
+        with patch("asyncio.sleep", sleep):
+            await feed._cleanup_loop()
+
+        assert _delays(sleep) == [30.0]
+
+    async def test_cleanup_interval_override_is_honoured(self):
+        feed, _, _ = _make_feed(max_retention_seconds=60, cleanup_interval_seconds=5.0)
+        feed._active = True
+        sleep = _stop_after_sleeps(feed)
+
+        with patch("asyncio.sleep", sleep):
+            await feed._cleanup_loop()
+
+        assert _delays(sleep) == [5.0]
+
+    async def test_reconnect_delay_grows_exponentially_and_is_capped(self):
+        feed, _, network_client = _make_feed(rng=_upper_bound)
+        feed._active = True
+        network_client.ws_connect.side_effect = RuntimeError("boom")
+        sleep = _stop_after_sleeps(feed, count=8)
+
+        with patch("asyncio.sleep", sleep):
+            await feed._listen_loop()
+
+        assert _delays(sleep) == [1.0, 2.0, 4.0, 8.0, 16.0, 30.0, 30.0, 30.0]
+
+    async def test_reconnect_jitter_stays_within_bounds(self):
+        rng = MagicMock(return_value=0.25)
+        feed, _, network_client = _make_feed(rng=rng)
+        feed._active = True
+        network_client.ws_connect.side_effect = RuntimeError("boom")
+        sleep = _stop_after_sleeps(feed, count=7)
+
+        with patch("asyncio.sleep", sleep):
+            await feed._listen_loop()
+
+        assert _delays(sleep) == [0.25] * 7
+        assert [c.args for c in rng.call_args_list] == [
+            (0, 1.0),
+            (0, 2.0),
+            (0, 4.0),
+            (0, 8.0),
+            (0, 16.0),
+            (0, 30.0),
+            (0, 30.0),
+        ]
+
+    async def test_attempt_counter_resets_after_successful_connect(self):
+        feed, adapter, network_client = _make_feed(rng=_upper_bound)
+        feed._active = True
+        adapter.subscribe = AsyncMock()
+
+        async def _no_messages():
+            return
+            yield
+
+        ws = MagicMock()
+        ws.iter_messages.return_value = _no_messages()
+        ws.disconnect = AsyncMock()
+        network_client.ws_connect.side_effect = [
+            RuntimeError("a"),
+            RuntimeError("b"),
+            ws,
+            RuntimeError("c"),
+        ]
+        sleep = _stop_after_sleeps(feed, count=3)
+
+        with patch("asyncio.sleep", sleep):
+            await feed._listen_loop()
+
+        assert _delays(sleep) == [1.0, 2.0, 1.0]
+
+    async def test_connection_error_logs_only_warning(self):
+        feed, _, network_client = _make_feed()
+        feed._active = True
+        network_client.ws_connect.side_effect = ConnectionError("down")
+        sleep = _stop_after_sleeps(feed)
+
+        with (
+            patch("asyncio.sleep", sleep),
+            patch("liquidations_feed.core.liquidations_feed.logger") as mock_logger,
+        ):
+            await feed._listen_loop()
+
+        mock_logger.warning.assert_called_once()
+        mock_logger.error.assert_not_called()
+
+    async def test_other_errors_still_log_error(self):
+        feed, _, network_client = _make_feed()
+        feed._active = True
+        network_client.ws_connect.side_effect = RuntimeError("boom")
+        sleep = _stop_after_sleeps(feed)
+
+        with (
+            patch("asyncio.sleep", sleep),
+            patch("liquidations_feed.core.liquidations_feed.logger") as mock_logger,
+        ):
+            await feed._listen_loop()
+
+        mock_logger.error.assert_called_once()
 
 
 class TestCleanup:
