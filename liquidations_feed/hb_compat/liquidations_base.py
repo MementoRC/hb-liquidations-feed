@@ -1,8 +1,12 @@
-"""Synchronous ``LiquidationsBase``-compatible wrapper around the async core feed.
+"""Legacy bridge: synchronous ``LiquidationsBase``-compatible wrapper around the async core feed.
 
-Upstream consumers call ``start()``/``stop()`` synchronously from inside a running event loop
-and poll ``ready`` and ``liquidations_df()``. The core ``LiquidationsFeed`` keeps its async
-lifecycle; this wrapper schedules the coroutines as tasks and never creates an event loop.
+Upstream consumers call ``start()``/``stop()`` synchronously (for example from a constructor)
+and poll ``ready`` and ``liquidations_df()``. This wrapper schedules the coroutines as tasks and
+never creates an event loop. A ``start()`` made with no running loop is deferred until the first
+later access inside a running loop; that deferral exists only to bridge the legacy pattern.
+
+The core ``LiquidationsFeed`` is async-only and is the supported API. New code should
+``await feed.start()`` from an async lifecycle hook instead of starting I/O in a constructor.
 """
 
 from __future__ import annotations
@@ -26,8 +30,10 @@ logger = get_logger(__name__)
 class LiquidationsBase:
     """Wraps a core feed and exposes the upstream ``LiquidationsBase`` public API.
 
-    This is the hummingbot drop-in. New code should use the async core ``LiquidationsFeed``
-    directly.
+    This is an hb_compat legacy bridge for consumers that call ``start()`` synchronously, for
+    example from a constructor. The deferred start exists only to bridge that legacy pattern.
+    The core ``LiquidationsFeed`` is async-only and is the supported API; new code should
+    ``await feed.start()`` from an async lifecycle hook instead of starting I/O in a constructor.
     """
 
     def __init__(self, feed: LiquidationsFeed):
