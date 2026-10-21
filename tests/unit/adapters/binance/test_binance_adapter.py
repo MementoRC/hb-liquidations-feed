@@ -104,6 +104,7 @@ class TestBinancePerpetualAdapterProcessMessage:
     def test_process_message_long_liquidation(self):
         """SELL side on Binance means a LONG position was liquidated."""
         adapter = _make_adapter()
+        adapter._trading_pair_map = {"BTCUSDT": "BTC-USDT"}
         feed = MagicMock()
 
         msg = _make_force_order_event(
@@ -120,7 +121,7 @@ class TestBinancePerpetualAdapterProcessMessage:
         trading_pair = call_args[0][0]
         liquidation: Liquidation = call_args[0][1]
 
-        assert trading_pair == "BTCUSDT"
+        assert trading_pair == "BTC-USDT"
         assert liquidation.side is LiquidationSide.LONG
         assert liquidation.price == 30_000.0
         assert liquidation.quantity == 0.5
@@ -129,6 +130,7 @@ class TestBinancePerpetualAdapterProcessMessage:
     def test_process_message_short_liquidation(self):
         """BUY side on Binance means a SHORT position was liquidated."""
         adapter = _make_adapter()
+        adapter._trading_pair_map = {"ETHUSDT": "ETH-USDT"}
         feed = MagicMock()
 
         msg = _make_force_order_event(
@@ -163,6 +165,7 @@ class TestBinancePerpetualAdapterProcessMessage:
     def test_process_message_uses_average_price(self):
         """The liquidation price is the average price 'ap', not the order price 'p'."""
         adapter = _make_adapter()
+        adapter._trading_pair_map = {"BTCUSDT": "BTC-USDT"}
         feed = MagicMock()
 
         msg = _make_force_order_event(price="30000.0", avg_price="29950.5")
@@ -181,6 +184,30 @@ class TestBinancePerpetualAdapterProcessMessage:
         adapter.process_message(msg, feed)
 
         assert feed.add_liquidation.call_args[0][0] == "BTC-USDT"
+
+
+class TestBinancePerpetualAdapterUnmappedSymbols:
+    def test_delivery_symbol_without_pair_is_dropped_and_logged(self, caplog):
+        adapter = _make_adapter()
+        adapter._trading_pair_map = {"BTCUSDT": "BTC-USDT"}
+        feed = MagicMock()
+        msg = _make_force_order_event(symbol="BTCUSDT_251226")
+        del msg["o"]["pair"]
+
+        with caplog.at_level("DEBUG"):
+            adapter.process_message(msg, feed)
+
+        feed.add_liquidation.assert_not_called()
+        assert "BTCUSDT_251226" in caplog.text
+
+    def test_symbol_not_in_populated_map_is_dropped(self):
+        adapter = _make_adapter()
+        adapter._trading_pair_map = {"BTCUSDT": "BTC-USDT"}
+        feed = MagicMock()
+
+        adapter.process_message(_make_force_order_event(symbol="ETHUSDT"), feed)
+
+        feed.add_liquidation.assert_not_called()
 
 
 def _symbol_info(symbol, pair, base="BTC", quote="USDT"):
@@ -276,6 +303,7 @@ class TestBinancePerpetualAdapterProcessMessageInvalid:
     def test_process_message_timestamp_conversion(self):
         """Timestamp should be converted from milliseconds to seconds."""
         adapter = _make_adapter()
+        adapter._trading_pair_map = {"BTCUSDT": "BTC-USDT"}
         feed = MagicMock()
 
         ts_ms = 1_700_000_000_123

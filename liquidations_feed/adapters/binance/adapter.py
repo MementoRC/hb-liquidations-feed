@@ -62,7 +62,10 @@ class BinancePerpetualAdapter(BaseAdapter):
 
         try:
             exchange_pair = event.get("pair") or event.get("s", "")
-            trading_pair = self._trading_pair_map.get(exchange_pair, exchange_pair)
+            trading_pair = self._trading_pair_map.get(exchange_pair)
+            if trading_pair is None:
+                logger.debug(f"Dropping liquidation for unmapped symbol {exchange_pair!r}")
+                return
 
             side_str = event.get("S", "")
             # SELL means a long position was liquidated, BUY means a short was liquidated
