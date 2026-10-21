@@ -106,3 +106,12 @@ def test_binance_limits_are_registered_and_linked_to_request_weight():
     for rl in constants.RATE_LIMITS:
         if rl.limit_id != constants.REQUEST_WEIGHT:
             assert [p.limit_id for p in rl.linked_limits] == [constants.REQUEST_WEIGHT]
+    weights = {
+        rl.limit_id: rl.linked_limits[0].weight
+        for rl in constants.RATE_LIMITS
+        if rl.limit_id != constants.REQUEST_WEIGHT
+    }
+    assert weights == {
+        constants.HEALTH_CHECK_ENDPOINT: 1,
+        constants.EXCHANGE_INFO_ENDPOINT: 40,
+    }
