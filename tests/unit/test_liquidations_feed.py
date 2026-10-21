@@ -212,6 +212,70 @@ class TestStartStop:
         network_client.close.assert_called_once()
 
 
+def _stop_after_first_sleep(feed):
+    """Return an asyncio.sleep stand-in that records its delay and deactivates the feed."""
+    sleep = AsyncMock()
+
+    async def _side_effect(delay):
+        feed._active = False
+
+    sleep.side_effect = _side_effect
+    return sleep
+
+
+class TestTiming:
+    async def test_cleanup_interval_matches_upstream(self):
+        feed, _, _ = _make_feed(max_retention_seconds=60)
+        feed._active = True
+        sleep = _stop_after_first_sleep(feed)
+
+        with patch("asyncio.sleep", sleep):
+            await feed._cleanup_loop()
+
+        sleep.assert_called_once_with(1.0)
+
+    async def test_reconnect_delay_matches_upstream(self):
+        feed, _, network_client = _make_feed()
+        feed._active = True
+        network_client.ws_connect.side_effect = RuntimeError("boom")
+        sleep = _stop_after_first_sleep(feed)
+
+        with patch("asyncio.sleep", sleep):
+            await feed._listen_loop()
+
+        sleep.assert_called_once_with(1.0)
+
+    async def test_connection_error_logs_only_warning(self):
+        feed, _, network_client = _make_feed()
+        feed._active = True
+        network_client.ws_connect.side_effect = ConnectionError("down")
+        sleep = _stop_after_first_sleep(feed)
+
+        with (
+            patch("asyncio.sleep", sleep),
+            patch("liquidations_feed.core.liquidations_feed.logger") as mock_logger,
+        ):
+            await feed._listen_loop()
+
+        mock_logger.warning.assert_called_once()
+        mock_logger.error.assert_not_called()
+        sleep.assert_called_once_with(1.0)
+
+    async def test_other_errors_still_log_error(self):
+        feed, _, network_client = _make_feed()
+        feed._active = True
+        network_client.ws_connect.side_effect = RuntimeError("boom")
+        sleep = _stop_after_first_sleep(feed)
+
+        with (
+            patch("asyncio.sleep", sleep),
+            patch("liquidations_feed.core.liquidations_feed.logger") as mock_logger,
+        ):
+            await feed._listen_loop()
+
+        mock_logger.error.assert_called_once()
+
+
 class TestCleanup:
     def test_cleanup_removes_old_data(self):
         feed, _, _ = _make_feed(max_retention_seconds=60)

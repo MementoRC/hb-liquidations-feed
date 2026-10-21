@@ -27,11 +27,15 @@ class LiquidationsFeed:
         trading_pairs: set[str] | None = None,
         max_retention_seconds: int = 60,
         network_client: NetworkClientProtocol | None = None,
+        cleanup_interval_seconds: float = 1.0,
+        reconnect_delay_seconds: float = 1.0,
     ):
         self._adapter = adapter
         self._trading_pairs = trading_pairs or set()
         self._max_retention_seconds = max_retention_seconds
         self._network_client = network_client or NetworkClient()
+        self._cleanup_interval_seconds = cleanup_interval_seconds
+        self._reconnect_delay_seconds = reconnect_delay_seconds
         self._liquidations: dict[str, list[Liquidation]] = defaultdict(list)
         self._listen_task: asyncio.Task | None = None
         self._cleanup_task: asyncio.Task | None = None
@@ -96,16 +100,21 @@ class LiquidationsFeed:
                     self._subscribed = False
             except asyncio.CancelledError:
                 raise
+            except ConnectionError as e:
+                logger.warning(f"Connection error in liquidations listen loop: {e}")
+                self._subscribed = False
+                if self._active:
+                    await asyncio.sleep(self._reconnect_delay_seconds)
             except Exception as e:
                 logger.error(f"Error in liquidations listen loop: {e}")
                 self._subscribed = False
                 if self._active:
-                    await asyncio.sleep(5)
+                    await asyncio.sleep(self._reconnect_delay_seconds)
 
     async def _cleanup_loop(self) -> None:
         while self._active:
             try:
-                await asyncio.sleep(self._max_retention_seconds / 2)
+                await asyncio.sleep(self._cleanup_interval_seconds)
                 cutoff = time.time() - self._max_retention_seconds
                 for pair in list(self._liquidations.keys()):
                     self._liquidations[pair] = [
