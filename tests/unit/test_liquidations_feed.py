@@ -14,6 +14,7 @@ from liquidations_feed.core.liquidations_feed import LiquidationsFeed
 def _make_feed(trading_pairs=None, max_retention_seconds=60):
     adapter = MagicMock()
     adapter.name = "test_exchange"
+    adapter.fetch_trading_pair_map = AsyncMock(return_value={"BTCUSDT": "BTC-USDT"})
     network_client = AsyncMock()
     feed = LiquidationsFeed(
         adapter=adapter,
@@ -173,6 +174,68 @@ class TestStartStop:
             await feed.start()  # second call should be a no-op
 
         assert call_count[0] == 2  # only from first start()
+
+    async def test_start_fetches_pair_map_once_before_tasks(self):
+        feed, adapter, network_client = _make_feed()
+        order = []
+        adapter.fetch_trading_pair_map.side_effect = lambda nc: (
+            order.append("fetch") or {"BTCUSDT": "BTC-USDT"}
+        )
+
+        def fake_create_task(coro):
+            order.append("task")
+            coro.close()
+            task = MagicMock(spec=asyncio.Task)
+            task.done.return_value = False
+            return task
+
+        with patch("asyncio.create_task", side_effect=fake_create_task):
+            await feed.start()
+
+        adapter.fetch_trading_pair_map.assert_awaited_once_with(network_client)
+        assert order == ["fetch", "task", "task"]
+
+    async def test_start_idempotent_does_not_refetch(self):
+        feed, adapter, _ = _make_feed()
+
+        def fake_create_task(coro):
+            coro.close()
+            task = MagicMock(spec=asyncio.Task)
+            task.done.return_value = False
+            return task
+
+        with patch("asyncio.create_task", side_effect=fake_create_task):
+            await feed.start()
+            await feed.start()
+
+        adapter.fetch_trading_pair_map.assert_awaited_once()
+
+    async def test_start_raises_on_empty_map(self):
+        feed, adapter, _ = _make_feed()
+        adapter.fetch_trading_pair_map.return_value = {}
+
+        with (
+            patch("asyncio.create_task") as create_task,
+            pytest.raises(RuntimeError, match="trading-pair map"),
+        ):
+            await feed.start()
+
+        create_task.assert_not_called()
+        assert feed._active is False
+
+    async def test_start_propagates_fetch_error_and_can_retry(self):
+        feed, adapter, _ = _make_feed()
+        adapter.fetch_trading_pair_map.side_effect = ConnectionError("boom")
+
+        with (
+            patch("asyncio.create_task") as create_task,
+            pytest.raises(ConnectionError),
+        ):
+            await feed.start()
+
+        create_task.assert_not_called()
+        assert feed._active is False
+        assert feed._listen_task is None
 
     async def test_stop_cancels_tasks(self):
         feed, _, network_client = _make_feed()
