@@ -2,9 +2,11 @@
 
 import asyncio
 import logging
+from unittest.mock import AsyncMock, MagicMock
 
 import pandas as pd
 
+from liquidations_feed.core.liquidations_feed import LiquidationsFeed
 from liquidations_feed.hb_compat import LiquidationsBase, LiquidationsConfig, LiquidationsFactory
 
 
@@ -226,6 +228,40 @@ def test_accessors_delegate():
     base.liquidations_df("BTC-USDT")
     assert feed.df_calls == [None, "BTC-USDT"]
     assert isinstance(base.liquidations_df("BTC-USDT"), pd.DataFrame)
+
+
+def test_deferred_start_with_real_core_feed_empty_map_then_retry(caplog):
+    adapter = MagicMock()
+    adapter.name = "mock"
+    adapter.fetch_trading_pair_map = AsyncMock(return_value={})
+    network_client = MagicMock()
+    network_client.close = AsyncMock()
+    core = LiquidationsFeed(
+        adapter=adapter, trading_pairs={"BTC-USDT"}, network_client=network_client
+    )
+    core._listen_loop = AsyncMock()
+    core._cleanup_loop = AsyncMock()
+
+    base = LiquidationsBase(core)
+    base.start()
+    assert not base._tasks
+
+    async def scenario():
+        with caplog.at_level(logging.ERROR):
+            assert base.ready is False
+            await _settle()
+        assert base.ready is False
+        assert "empty trading-pair map" in caplog.text
+
+        adapter.fetch_trading_pair_map.return_value = {"BTCUSDT": "BTC-USDT"}
+        base.start()
+        await _settle()
+        assert base.ready is True
+        base.stop()
+        await _settle()
+
+    asyncio.run(scenario())
+    assert adapter.fetch_trading_pair_map.await_count == 2
 
 
 def test_factory_returns_wrapper():
