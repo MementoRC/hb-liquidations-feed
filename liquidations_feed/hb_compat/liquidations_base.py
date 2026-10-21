@@ -14,7 +14,7 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
-from liquidations_feed.hb_compat.common import get_logger
+from liquidations_feed.hb_compat.common import get_logger, liquidations_df_with_ms
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
@@ -65,7 +65,7 @@ class LiquidationsBase:
 
     def liquidations_df(self, trading_pair: str | None = None) -> pd.DataFrame:
         self._maybe_start_pending()
-        return self._feed.liquidations_df(trading_pair)
+        return liquidations_df_with_ms(self._feed.liquidations_df(trading_pair))
 
     def start(self) -> None:
         """Schedule the core ``start()``. No-op if already pending or running.
