@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel
 
 if TYPE_CHECKING:
-    from liquidations_feed.core.liquidations_feed import LiquidationsFeed
+    from liquidations_feed.hb_compat.liquidations_base import LiquidationsBase
 
 # NOTE: adapter/feed imports below are deferred into get_liquidations_feed() rather than
 # module scope. adapters.binance.adapter and core.liquidations_feed both import
@@ -34,17 +34,20 @@ class LiquidationsConfig(BaseModel):
 
 class LiquidationsFactory:
     @classmethod
-    def get_liquidations_feed(cls, config: LiquidationsConfig) -> "LiquidationsFeed":
+    def get_liquidations_feed(cls, config: LiquidationsConfig) -> "LiquidationsBase":
         from liquidations_feed.adapters.binance import BinancePerpetualAdapter
         from liquidations_feed.core.liquidations_feed import LiquidationsFeed
+        from liquidations_feed.hb_compat.liquidations_base import LiquidationsBase
 
         connector_map = {"binance": BinancePerpetualAdapter}
         adapter_cls = connector_map.get(config.connector)
         if adapter_cls is None:
             raise UnsupportedConnectorError(config.connector)
         adapter = adapter_cls()
-        return LiquidationsFeed(
-            adapter=adapter,
-            trading_pairs=config.trading_pairs,
-            max_retention_seconds=config.max_retention_seconds,
+        return LiquidationsBase(
+            LiquidationsFeed(
+                adapter=adapter,
+                trading_pairs=config.trading_pairs,
+                max_retention_seconds=config.max_retention_seconds,
+            )
         )

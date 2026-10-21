@@ -9,6 +9,7 @@ from liquidations_feed.hb_compat.factory import (
     LiquidationsFactory,
     UnsupportedConnectorError,
 )
+from liquidations_feed.hb_compat.liquidations_base import LiquidationsBase
 
 
 class TestLiquidationsConfig:
@@ -33,8 +34,9 @@ class TestLiquidationsFactory:
         config = LiquidationsConfig(connector="binance")
         feed = LiquidationsFactory.get_liquidations_feed(config)
 
-        assert isinstance(feed, LiquidationsFeed)
-        assert isinstance(feed._adapter, BinancePerpetualAdapter)
+        assert isinstance(feed, LiquidationsBase)
+        assert isinstance(feed.feed, LiquidationsFeed)
+        assert isinstance(feed.feed._adapter, BinancePerpetualAdapter)
 
     def test_get_binance_feed_with_trading_pairs(self):
         pairs = {"BTC-USDT", "ETH-USDT"}
@@ -47,7 +49,7 @@ class TestLiquidationsFactory:
         config = LiquidationsConfig(connector="binance", max_retention_seconds=300)
         feed = LiquidationsFactory.get_liquidations_feed(config)
 
-        assert feed._max_retention_seconds == 300
+        assert feed.feed._max_retention_seconds == 300
 
     def test_unknown_connector_raises(self):
         config = LiquidationsConfig(connector="kraken")
@@ -66,4 +68,4 @@ class TestLiquidationsFactory:
         # Can be called on the class directly
         config = LiquidationsConfig(connector="binance")
         feed = LiquidationsFactory.get_liquidations_feed(config)
-        assert isinstance(feed, LiquidationsFeed)
+        assert isinstance(feed, LiquidationsBase)
