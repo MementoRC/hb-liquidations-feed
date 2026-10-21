@@ -65,6 +65,12 @@ class LiquidationsFeed:
     async def start(self) -> None:
         if self._active:
             return
+        pair_map = await self._adapter.fetch_trading_pair_map(self._network_client)
+        if not pair_map:
+            raise RuntimeError(
+                f"{self.name}: fetched an empty trading-pair map; "
+                "refusing to stream raw exchange symbols"
+            )
         self._active = True
         self._listen_task = asyncio.create_task(self._listen_loop())
         self._cleanup_task = asyncio.create_task(self._cleanup_loop())
