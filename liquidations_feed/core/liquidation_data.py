@@ -16,6 +16,13 @@ class LiquidationSide(enum.Enum):
 
 @dataclass
 class Liquidation:
+    """A single liquidation event.
+
+    ``timestamp`` is float epoch **seconds** (comparable with ``time.time()``).
+    Upstream's hb_compat contract uses int milliseconds; convert with
+    ``liquidations_feed.hb_compat.common.seconds_to_ms`` at that boundary only.
+    """
+
     timestamp: float
     trading_pair: str
     quantity: float
