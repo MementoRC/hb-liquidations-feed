@@ -35,7 +35,7 @@ class FakeFeed:
 
     def liquidations_df(self, trading_pair=None):
         self.df_calls.append(trading_pair)
-        return pd.DataFrame({"pair": [trading_pair]})
+        return pd.DataFrame({"pair": [trading_pair], "timestamp": [1700000000.1234]})
 
 
 async def _settle():
@@ -228,6 +228,28 @@ def test_accessors_delegate():
     base.liquidations_df("BTC-USDT")
     assert feed.df_calls == [None, "BTC-USDT"]
     assert isinstance(base.liquidations_df("BTC-USDT"), pd.DataFrame)
+
+
+def test_liquidations_df_timestamp_is_int_milliseconds():
+    base = LiquidationsBase(FakeFeed())
+
+    df = base.liquidations_df()
+
+    assert df["timestamp"].dtype == "int64"
+    assert df["timestamp"].tolist() == [1700000000123]
+
+
+def test_liquidations_df_empty_feed_has_int_timestamp_column():
+    core = LiquidationsFeed(
+        adapter=MagicMock(), trading_pairs={"BTC-USDT"}, network_client=MagicMock()
+    )
+    base = LiquidationsBase(core)
+
+    df = base.liquidations_df()
+
+    assert df.empty
+    assert "timestamp" in df.columns
+    assert df["timestamp"].dtype == "int64"
 
 
 def test_deferred_start_with_real_core_feed_empty_map_then_retry(caplog):

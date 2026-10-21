@@ -14,7 +14,7 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
-from liquidations_feed.hb_compat.common import get_logger
+from liquidations_feed.hb_compat.common import get_logger, liquidations_df_with_ms
 from liquidations_feed.hb_compat.network_status import NetworkStatus
 
 if TYPE_CHECKING:
@@ -66,7 +66,7 @@ class LiquidationsBase:
 
     def liquidations_df(self, trading_pair: str | None = None) -> pd.DataFrame:
         self._maybe_start_pending()
-        return self._feed.liquidations_df(trading_pair)
+        return liquidations_df_with_ms(self._feed.liquidations_df(trading_pair))
 
     async def check_network(self) -> NetworkStatus:
         """Upstream ``check_network``: ping the exchange REST health endpoint, rate limited.
