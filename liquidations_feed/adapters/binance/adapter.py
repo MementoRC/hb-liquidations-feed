@@ -61,7 +61,7 @@ class BinancePerpetualAdapter(BaseAdapter):
             return
 
         try:
-            exchange_pair = event.get("s", "")
+            exchange_pair = event.get("pair") or event.get("s", "")
             trading_pair = self._trading_pair_map.get(exchange_pair, exchange_pair)
 
             side_str = event.get("S", "")
@@ -72,7 +72,7 @@ class BinancePerpetualAdapter(BaseAdapter):
                 timestamp=float(event.get("T", 0)) / 1000.0,
                 trading_pair=trading_pair,
                 quantity=float(event.get("q", 0)),
-                price=float(event.get("p", 0)),
+                price=float(event.get("ap", 0)),
                 side=side,
             )
             feed.add_liquidation(trading_pair, liquidation)
@@ -83,15 +83,40 @@ class BinancePerpetualAdapter(BaseAdapter):
     async def fetch_trading_pair_map(self, network_client) -> dict:
         url = f"{self.rest_url}{constants.EXCHANGE_INFO_ENDPOINT}"
         data = await network_client.rest_get(url)
-        mapping = {}
+        mapping: dict[str, str] = {}
         for symbol_info in data.get("symbols", []):
-            exchange_symbol = symbol_info["symbol"]
+            exchange_symbol = symbol_info["pair"]
             base = symbol_info["baseAsset"]
             quote = symbol_info["quoteAsset"]
             hb_pair = f"{base}-{quote}"
-            mapping[exchange_symbol] = hb_pair
+            if hb_pair in mapping.values():
+                self._resolve_trading_pair_symbols_duplicate(mapping, exchange_symbol, base, quote)
+            else:
+                mapping[exchange_symbol] = hb_pair
         self._trading_pair_map = mapping
         return mapping
+
+    @staticmethod
+    def _resolve_trading_pair_symbols_duplicate(
+        mapping: dict[str, str], new_exchange_symbol: str, base: str, quote: str
+    ) -> None:
+        """Resolve name conflicts caused by delivery contracts.
+
+        The BASEQUOTE exchange symbol wins if it is one of the two candidates;
+        otherwise the pair is dropped from the map.
+        """
+        expected_exchange_symbol = f"{base}{quote}"
+        hb_pair = f"{base}-{quote}"
+        current_exchange_symbol = next(k for k, v in mapping.items() if v == hb_pair)
+        if current_exchange_symbol == expected_exchange_symbol:
+            return
+        mapping.pop(current_exchange_symbol)
+        if new_exchange_symbol == expected_exchange_symbol:
+            mapping[new_exchange_symbol] = hb_pair
+        else:
+            logger.warning(
+                f"Could not resolve the exchange symbols {new_exchange_symbol} and {current_exchange_symbol}"
+            )
 
     def _get_exchange_pair(self, trading_pair: str) -> str | None:
         # Reverse lookup

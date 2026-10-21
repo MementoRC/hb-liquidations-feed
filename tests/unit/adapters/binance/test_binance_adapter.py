@@ -19,6 +19,8 @@ def _make_force_order_event(
     price="30000.0",
     quantity="0.5",
     timestamp=1_700_000_000_000,
+    avg_price=None,
+    pair=None,
 ):
     """Build a forceOrder message in Binance WebSocket format."""
     return {
@@ -26,12 +28,13 @@ def _make_force_order_event(
         "E": timestamp,
         "o": {
             "s": symbol,
+            "pair": pair if pair is not None else symbol,
             "S": side,
             "o": "LIMIT",
             "f": "IOC",
             "q": quantity,
             "p": price,
-            "ap": price,
+            "ap": avg_price if avg_price is not None else price,
             "X": "FILLED",
             "l": quantity,
             "z": quantity,
@@ -157,6 +160,90 @@ class TestBinancePerpetualAdapterProcessMessage:
         assert trading_pair == "BTC-USDT"
         assert liquidation.trading_pair == "BTC-USDT"
 
+    def test_process_message_uses_average_price(self):
+        """The liquidation price is the average price 'ap', not the order price 'p'."""
+        adapter = _make_adapter()
+        feed = MagicMock()
+
+        msg = _make_force_order_event(price="30000.0", avg_price="29950.5")
+        adapter.process_message(msg, feed)
+
+        liquidation: Liquidation = feed.add_liquidation.call_args[0][1]
+        assert liquidation.price == 29_950.5
+
+    def test_process_message_maps_pair_field_not_symbol(self):
+        """Delivery contract symbol 's' resolves through the 'pair' field."""
+        adapter = _make_adapter()
+        adapter._trading_pair_map = {"BTCUSDT": "BTC-USDT"}
+        feed = MagicMock()
+
+        msg = _make_force_order_event(symbol="BTCUSDT_241227", pair="BTCUSDT")
+        adapter.process_message(msg, feed)
+
+        assert feed.add_liquidation.call_args[0][0] == "BTC-USDT"
+
+
+def _symbol_info(symbol, pair, base="BTC", quote="USDT"):
+    return {"symbol": symbol, "pair": pair, "baseAsset": base, "quoteAsset": quote}
+
+
+class TestBinancePerpetualAdapterFetchTradingPairMap:
+    async def test_keys_by_pair_field(self):
+        adapter = _make_adapter()
+        client = MagicMock()
+        client.rest_get = AsyncMock(return_value={"symbols": [_symbol_info("BTCUSDT", "BTCUSDT")]})
+
+        mapping = await adapter.fetch_trading_pair_map(client)
+
+        assert mapping == {"BTCUSDT": "BTC-USDT"}
+        assert adapter._trading_pair_map == mapping
+
+    async def test_delivery_contract_dedupe_prefers_expected_symbol(self):
+        """Perpetual and delivery contract mapping to one pair resolve deterministically."""
+        perp = _symbol_info("BTCUSDT", "BTCUSDT")
+        delivery = _symbol_info("BTCUSDT_241227", "BTCUSDT_241227")
+        for symbols in ([perp, delivery], [delivery, perp]):
+            adapter = _make_adapter()
+            client = MagicMock()
+            client.rest_get = AsyncMock(return_value={"symbols": symbols})
+
+            mapping = await adapter.fetch_trading_pair_map(client)
+
+            assert mapping == {"BTCUSDT": "BTC-USDT"}
+
+    async def test_unresolvable_duplicate_removes_pair(self):
+        adapter = _make_adapter()
+        client = MagicMock()
+        client.rest_get = AsyncMock(
+            return_value={
+                "symbols": [
+                    _symbol_info("BTCUSDT_241227", "BTCUSDT_241227"),
+                    _symbol_info("BTCUSDT_250328", "BTCUSDT_250328"),
+                ]
+            }
+        )
+
+        mapping = await adapter.fetch_trading_pair_map(client)
+
+        assert mapping == {}
+
+    async def test_reverse_lookup_uses_deduped_map(self):
+        adapter = _make_adapter()
+        client = MagicMock()
+        client.rest_get = AsyncMock(
+            return_value={
+                "symbols": [
+                    _symbol_info("BTCUSDT_241227", "BTCUSDT_241227"),
+                    _symbol_info("BTCUSDT", "BTCUSDT"),
+                ]
+            }
+        )
+        await adapter.fetch_trading_pair_map(client)
+
+        assert adapter._get_exchange_pair("BTC-USDT") == "BTCUSDT"
+
+
+class TestBinancePerpetualAdapterProcessMessageInvalid:
     def test_process_message_invalid_data_non_dict(self):
         """Non-dict messages are silently ignored."""
         adapter = _make_adapter()
