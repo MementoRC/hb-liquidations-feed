@@ -53,11 +53,13 @@ class BinancePerpetualAdapter(BaseAdapter):
         if not isinstance(msg, dict):
             return
 
-        # Handle array format (!forceOrder@arr)
-        event = msg.get("o") if "o" in msg else None
-        if event is None and msg.get("e") == "forceOrder":
-            event = msg.get("o")
-        if event is None:
+        # /market/stream wraps every event as {"stream": ..., "data": {...}}.
+        # Subscribe acks ({"result": null, "id": 1}) carry no "data" and are skipped.
+        payload = msg.get("data")
+        if not isinstance(payload, dict):
+            return
+        event = payload.get("o")
+        if not isinstance(event, dict):
             return
 
         try:
@@ -71,6 +73,7 @@ class BinancePerpetualAdapter(BaseAdapter):
             # SELL means a long position was liquidated, BUY means a short was liquidated
             side = LiquidationSide.LONG if side_str == "SELL" else LiquidationSide.SHORT
 
+            # Binance "T" is epoch ms; the core stores float epoch seconds.
             liquidation = Liquidation(
                 timestamp=float(event.get("T", 0)) / 1000.0,
                 trading_pair=trading_pair,

@@ -31,6 +31,7 @@ class TestLiquidation:
             side=LiquidationSide.LONG,
         )
         assert liq.timestamp == 1_700_000_000.0
+        assert isinstance(liq.timestamp, float)
         assert liq.trading_pair == "BTC-USDT"
         assert liq.quantity == 0.5
         assert liq.price == 30_000.0

@@ -22,23 +22,26 @@ def _make_force_order_event(
     avg_price=None,
     pair=None,
 ):
-    """Build a forceOrder message in Binance WebSocket format."""
+    """Build a forceOrder frame as delivered by the combined stream: {"stream", "data"}."""
     return {
-        "e": "forceOrder",
-        "E": timestamp,
-        "o": {
-            "s": symbol,
-            "pair": pair if pair is not None else symbol,
-            "S": side,
-            "o": "LIMIT",
-            "f": "IOC",
-            "q": quantity,
-            "p": price,
-            "ap": avg_price if avg_price is not None else price,
-            "X": "FILLED",
-            "l": quantity,
-            "z": quantity,
-            "T": timestamp,
+        "stream": "!forceOrder@arr",
+        "data": {
+            "e": "forceOrder",
+            "E": timestamp,
+            "o": {
+                "s": symbol,
+                "pair": pair if pair is not None else symbol,
+                "S": side,
+                "o": "LIMIT",
+                "f": "IOC",
+                "q": quantity,
+                "p": price,
+                "ap": avg_price if avg_price is not None else price,
+                "X": "FILLED",
+                "l": quantity,
+                "z": quantity,
+                "T": timestamp,
+            },
         },
     }
 
@@ -47,6 +50,9 @@ class TestBinancePerpetualAdapterProperties:
     def test_name(self):
         adapter = _make_adapter()
         assert adapter.name == "binance_perpetual"
+
+    def test_wss_url_is_market_stream_endpoint(self):
+        assert constants.WSS_URL == "wss://fstream.binance.com/market/stream"
 
     def test_wss_url(self):
         adapter = _make_adapter()
@@ -192,7 +198,7 @@ class TestBinancePerpetualAdapterUnmappedSymbols:
         adapter._trading_pair_map = {"BTCUSDT": "BTC-USDT"}
         feed = MagicMock()
         msg = _make_force_order_event(symbol="BTCUSDT_251226")
-        del msg["o"]["pair"]
+        del msg["data"]["o"]["pair"]
 
         with caplog.at_level("DEBUG"):
             adapter.process_message(msg, feed)
@@ -290,6 +296,44 @@ class TestBinancePerpetualAdapterProcessMessageInvalid:
         adapter.process_message({"e": "trade", "data": {}}, feed)
 
         feed.add_liquidation.assert_not_called()
+
+    def test_unwrapped_frame_is_ignored(self):
+        """/market/stream always wraps payloads; a bare event is not a shape it delivers."""
+        adapter = _make_adapter()
+        adapter._trading_pair_map = {"BTCUSDT": "BTC-USDT"}
+        feed = MagicMock()
+
+        adapter.process_message(_make_force_order_event()["data"], feed)
+
+        feed.add_liquidation.assert_not_called()
+
+    def test_subscribe_ack_is_ignored(self):
+        adapter = _make_adapter()
+        feed = MagicMock()
+
+        adapter.process_message({"result": None, "id": 1}, feed)
+
+        feed.add_liquidation.assert_not_called()
+
+    def test_wrapped_frame_is_unwrapped(self):
+        adapter = _make_adapter()
+        adapter._trading_pair_map = {"BTCUSDT": "BTC-USDT"}
+        feed = MagicMock()
+
+        adapter.process_message(_make_force_order_event(), feed)
+
+        feed.add_liquidation.assert_called_once()
+
+    def test_timestamp_is_float_seconds_from_ms_t(self):
+        adapter = _make_adapter()
+        adapter._trading_pair_map = {"BTCUSDT": "BTC-USDT"}
+        feed = MagicMock()
+
+        adapter.process_message(_make_force_order_event(timestamp=1_700_000_000_123), feed)
+
+        liquidation: Liquidation = feed.add_liquidation.call_args[0][1]
+        assert isinstance(liquidation.timestamp, float)
+        assert liquidation.timestamp == pytest.approx(1_700_000_000.123, abs=1e-6)
 
     def test_process_message_empty_dict(self):
         """Empty dict is silently ignored."""
