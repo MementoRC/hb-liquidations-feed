@@ -4,7 +4,6 @@ import asyncio
 import logging
 
 import pandas as pd
-import pytest
 
 from liquidations_feed.hb_compat import LiquidationsBase, LiquidationsConfig, LiquidationsFactory
 
@@ -57,11 +56,80 @@ async def test_start_schedules_task_and_sets_ready_after_completion():
     assert base.ready is True
 
 
-def test_start_without_running_loop_raises_runtime_error():
-    base = LiquidationsBase(FakeFeed())
-    with pytest.raises(RuntimeError, match="running event loop"):
+def test_start_without_running_loop_defers_without_raising_or_task():
+    feed = FakeFeed()
+    base = LiquidationsBase(feed)
+    base.start()
+    assert not base._tasks
+    assert base._start_task is None
+    assert feed.start_calls == 0
+
+
+def test_later_ready_access_in_loop_starts_exactly_once():
+    feed = FakeFeed()
+    feed.start_gate.set()
+    base = LiquidationsBase(feed)
+    base.start()
+
+    async def scenario():
+        assert base.ready is False
+        assert base.ready is False
+        await _settle()
+        assert base.ready is True
+
+    asyncio.run(scenario())
+    assert feed.start_calls == 1
+
+
+def test_stop_while_pending_means_never_starts():
+    feed = FakeFeed()
+    feed.start_gate.set()
+    base = LiquidationsBase(feed)
+    base.start()
+    base.stop()
+    assert not base._tasks
+
+    async def scenario():
+        assert base.ready is False
+        base.liquidations_df()
+        await _settle()
+        assert base.ready is False
+
+    asyncio.run(scenario())
+    assert feed.start_calls == 0
+    assert feed.stop_calls == 0
+
+
+def test_double_start_guard_in_pending_state():
+    feed = FakeFeed()
+    feed.start_gate.set()
+    base = LiquidationsBase(feed)
+    base.start()
+    base.start()
+
+    async def scenario():
         base.start()
-    assert base.ready is False
+        base.start()
+        await _settle()
+
+    asyncio.run(scenario())
+    assert feed.start_calls == 1
+
+
+def test_pending_start_fires_from_liquidations_df():
+    feed = FakeFeed()
+    feed.start_gate.set()
+    base = LiquidationsBase(feed)
+    base.start()
+
+    async def scenario():
+        base.liquidations_df()
+        base.liquidations_df()
+        await _settle()
+        assert base.ready is True
+
+    asyncio.run(scenario())
+    assert feed.start_calls == 1
 
 
 async def test_start_is_idempotent_while_pending_and_running():
