@@ -25,6 +25,18 @@ Liquidation events occur when a leveraged position is forcibly closed by an exch
 |----------|-------------|--------|
 | Binance  | Perpetual   | `!forceOrder@arr` (WebSocket) |
 
+## Rate Limiting and Health Check
+
+REST calls (`exchangeInfo`, health ping) go through a built-in sliding-window `AsyncThrottler`
+configured from each adapter's `rate_limits` (Binance: 2400 weight/min, per the Binance USDS-M
+Futures docs). To share a budget with the host, inject any object satisfying `ThrottlerProtocol`
+(for example hummingbot's `AsyncThrottler`, configured with the adapter's limit ids) via
+`LiquidationsFeed(..., throttler=...)`. A custom `network_client` owns its own rate limiting.
+
+`await feed.check_network()` pings the exchange (`GET /fapi/v1/ping` for Binance) and returns a
+bool. The `hb_compat` `LiquidationsBase.check_network()` returns `NetworkStatus.CONNECTED` or
+`NetworkStatus.NOT_CONNECTED` and never raises on network failure (cancellation propagates).
+
 ## Installation
 
 ```bash

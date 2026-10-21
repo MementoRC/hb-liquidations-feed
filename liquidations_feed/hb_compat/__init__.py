@@ -17,6 +17,7 @@ from liquidations_feed.hb_compat.factory import (
     UnsupportedConnectorException,
 )
 from liquidations_feed.hb_compat.liquidations_base import LiquidationsBase
+from liquidations_feed.hb_compat.network_status import NetworkStatus
 
 __all__ = [
     "Liquidation",
@@ -24,6 +25,7 @@ __all__ = [
     "LiquidationsBase",
     "LiquidationsConfig",
     "LiquidationsFactory",
+    "NetworkStatus",
     "UnsupportedConnectorException",
     "get_logger",
 ]
