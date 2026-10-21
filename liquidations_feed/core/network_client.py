@@ -7,6 +7,7 @@ from typing import Any
 
 import aiohttp
 
+from liquidations_feed.core.protocols import ThrottlerProtocol
 from liquidations_feed.hb_compat.common import get_logger
 
 logger = get_logger(__name__)
@@ -42,8 +43,9 @@ class WSAssistant:
 class NetworkClient:
     """Standalone HTTP/WS client using aiohttp."""
 
-    def __init__(self):
+    def __init__(self, throttler: ThrottlerProtocol | None = None):
         self._session: aiohttp.ClientSession | None = None
+        self._throttler = throttler
 
     async def _ensure_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
@@ -55,9 +57,23 @@ class NetworkClient:
         ws = await session.ws_connect(url)
         return WSAssistant(ws)
 
-    async def rest_get(self, url: str, params: dict | None = None) -> Any:
+    async def rest_get(
+        self, url: str, params: dict | None = None, limit_id: str | None = None
+    ) -> Any:
+        """GET ``url`` and return the JSON body; raises on an HTTP error status.
+
+        When a throttler is set and ``limit_id`` is given, the request waits for rate-limit room.
+        """
         session = await self._ensure_session()
+        if self._throttler is not None and limit_id is not None:
+            async with self._throttler.execute_task(limit_id):
+                return await self._get_json(session, url, params)
+        return await self._get_json(session, url, params)
+
+    @staticmethod
+    async def _get_json(session: aiohttp.ClientSession, url: str, params: dict | None) -> Any:
         async with session.get(url, params=params) as resp:
+            resp.raise_for_status()
             return await resp.json()
 
     async def close(self) -> None:

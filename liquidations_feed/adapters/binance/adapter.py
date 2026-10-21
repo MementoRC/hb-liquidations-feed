@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, override
 from liquidations_feed.adapters.binance import constants
 from liquidations_feed.core.adapter_base import BaseAdapter
 from liquidations_feed.core.liquidation_data import Liquidation, LiquidationSide
+from liquidations_feed.core.throttler import RateLimit
 from liquidations_feed.hb_compat.common import get_logger
 
 if TYPE_CHECKING:
@@ -32,6 +33,21 @@ class BinancePerpetualAdapter(BaseAdapter):
     @property
     def rest_url(self) -> str:
         return constants.REST_URL
+
+    @override
+    @property
+    def health_check_url(self) -> str:
+        return f"{constants.REST_URL}{constants.HEALTH_CHECK_ENDPOINT}"
+
+    @override
+    @property
+    def health_check_limit_id(self) -> str:
+        return constants.HEALTH_CHECK_LIMIT_ID
+
+    @override
+    @property
+    def rate_limits(self) -> list[RateLimit]:
+        return constants.RATE_LIMITS
 
     @override
     async def subscribe(self, ws: "WSAssistantProtocol", trading_pairs: set[str]) -> None:
@@ -88,7 +104,7 @@ class BinancePerpetualAdapter(BaseAdapter):
     @override
     async def fetch_trading_pair_map(self, network_client) -> dict:
         url = f"{self.rest_url}{constants.EXCHANGE_INFO_ENDPOINT}"
-        data = await network_client.rest_get(url)
+        data = await network_client.rest_get(url, limit_id=constants.EXCHANGE_INFO_LIMIT_ID)
         mapping: dict[str, str] = {}
         for symbol_info in data.get("symbols", []):
             exchange_symbol = symbol_info["pair"]

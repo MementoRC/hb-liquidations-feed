@@ -15,6 +15,7 @@ import asyncio
 from typing import TYPE_CHECKING
 
 from liquidations_feed.hb_compat.common import get_logger, liquidations_df_with_ms
+from liquidations_feed.hb_compat.network_status import NetworkStatus
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
@@ -66,6 +67,17 @@ class LiquidationsBase:
     def liquidations_df(self, trading_pair: str | None = None) -> pd.DataFrame:
         self._maybe_start_pending()
         return liquidations_df_with_ms(self._feed.liquidations_df(trading_pair))
+
+    async def check_network(self) -> NetworkStatus:
+        """Upstream ``check_network``: ping the exchange REST health endpoint, rate limited.
+
+        Returns ``CONNECTED`` when the ping succeeds and ``NOT_CONNECTED`` on any failure
+        (upstream lets the exception escape to ``NetworkBase``; the return value is the contract).
+        Cancellation propagates. Unlike upstream it does not require ``start()`` to have run.
+        """
+        if await self._feed.check_network():
+            return NetworkStatus.CONNECTED
+        return NetworkStatus.NOT_CONNECTED
 
     def start(self) -> None:
         """Schedule the core ``start()``. No-op if already pending or running.

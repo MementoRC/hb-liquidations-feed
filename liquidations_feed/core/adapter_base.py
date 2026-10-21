@@ -3,6 +3,8 @@
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
+from liquidations_feed.core.throttler import RateLimit
+
 if TYPE_CHECKING:
     from liquidations_feed.core.liquidations_feed import LiquidationsFeed
     from liquidations_feed.core.protocols import WSAssistantProtocol
@@ -20,6 +22,18 @@ class BaseAdapter(ABC):
     @property
     @abstractmethod
     def rest_url(self) -> str: ...
+
+    @property
+    @abstractmethod
+    def health_check_url(self) -> str: ...
+
+    @property
+    @abstractmethod
+    def health_check_limit_id(self) -> str: ...
+
+    @property
+    @abstractmethod
+    def rate_limits(self) -> list[RateLimit]: ...
 
     @abstractmethod
     async def subscribe(self, ws: "WSAssistantProtocol", trading_pairs: set[str]) -> None: ...

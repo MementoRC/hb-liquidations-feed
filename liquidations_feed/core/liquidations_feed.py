@@ -11,7 +11,8 @@ import pandas as pd
 
 from liquidations_feed.core.liquidation_data import Liquidation, LiquidationSide, fields
 from liquidations_feed.core.network_client import NetworkClient
-from liquidations_feed.core.protocols import NetworkClientProtocol
+from liquidations_feed.core.protocols import NetworkClientProtocol, ThrottlerProtocol
+from liquidations_feed.core.throttler import AsyncThrottler
 from liquidations_feed.hb_compat.common import get_logger
 
 logger = get_logger(__name__)
@@ -33,11 +34,18 @@ class LiquidationsFeed:
         reconnect_delay_seconds: float = 1.0,
         reconnect_max_delay_seconds: float = 30.0,
         rng: Callable[[float, float], float] = random.uniform,
+        throttler: ThrottlerProtocol | None = None,
     ):
+        """``throttler`` paces the default network client's REST calls (default: an
+        ``AsyncThrottler`` built from ``adapter.rate_limits``). It is ignored when a custom
+        ``network_client`` is supplied, which then owns its own rate limiting.
+        """
         self._adapter = adapter
         self._trading_pairs = trading_pairs or set()
         self._max_retention_seconds = max_retention_seconds
-        self._network_client = network_client or NetworkClient()
+        self._network_client = network_client or NetworkClient(
+            throttler=throttler or AsyncThrottler(adapter.rate_limits)
+        )
         self._cleanup_interval_seconds = (
             cleanup_interval_seconds
             if cleanup_interval_seconds is not None
@@ -77,6 +85,23 @@ class LiquidationsFeed:
         if not data:
             return pd.DataFrame(columns=[f.name for f in fields(Liquidation)])
         return pd.DataFrame([vars(liq) for liq in data])
+
+    async def check_network(self) -> bool:
+        """Ping the exchange's REST health endpoint (rate limited).
+
+        Returns True if it answered successfully and False on any failure; cancellation
+        propagates.
+        """
+        try:
+            await self._network_client.rest_get(
+                self._adapter.health_check_url, limit_id=self._adapter.health_check_limit_id
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.debug(f"{self.name} health check failed: {e!r}")
+            return False
+        return True
 
     async def start(self) -> None:
         if self._active:

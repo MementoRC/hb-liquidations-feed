@@ -17,6 +17,7 @@ EXPECTED = [
     "LiquidationsBase",
     "LiquidationsConfig",
     "LiquidationsFactory",
+    "NetworkStatus",
     "UnsupportedConnectorException",
     "get_logger",
 ]
