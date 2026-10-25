@@ -1,10 +1,17 @@
 """AsyncThrottler: sliding-window limits, linked limits, and ThrottlerProtocol conformance."""
 
 import pytest
+from rate_limit.testing import assert_conforms_throttler
 
 from liquidations_feed.adapters.binance import constants
 from liquidations_feed.core.protocols import ThrottlerProtocol
-from liquidations_feed.core.throttler import AsyncThrottler, LinkedLimitWeightPair, RateLimit
+from liquidations_feed.core.throttler import (
+    AsyncThrottler,
+    LinkedLimitWeightPair,
+    RateLimit,
+    RateLimitWeightError,
+    UnknownRateLimitError,
+)
 
 
 class FakeTime:
@@ -80,20 +87,24 @@ async def test_linked_limit_is_shared_between_endpoints():
 
 async def test_unknown_limit_id_raises():
     throttler = AsyncThrottler([RateLimit("a", 1, 1)])
-    with pytest.raises(ValueError, match="Unknown rate limit id"):
+    with pytest.raises(UnknownRateLimitError):
         async with throttler.execute_task("nope"):
             pass
 
 
 async def test_weight_above_limit_raises_instead_of_hanging():
     throttler = AsyncThrottler([RateLimit("a", 1, 1, weight=2)])
-    with pytest.raises(ValueError, match="exceeds the limit"):
+    with pytest.raises(RateLimitWeightError):
         async with throttler.execute_task("a"):
             pass
 
 
 def test_throttler_satisfies_protocol():
     assert isinstance(AsyncThrottler([]), ThrottlerProtocol)
+
+
+def test_throttler_conforms_to_hb_rate_limit_suite():
+    assert_conforms_throttler(lambda limits, clock, sleep: AsyncThrottler(limits, clock, sleep))
 
 
 def test_binance_limits_are_registered_and_linked_to_request_weight():

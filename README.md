@@ -28,7 +28,7 @@ Liquidation events occur when a leveraged position is forcibly closed by an exch
 ## Rate Limiting and Health Check
 
 REST calls (`exchangeInfo`, health ping) go through a built-in sliding-window `AsyncThrottler`
-configured from each adapter's `rate_limits` (Binance: 2400 weight/min, per the Binance USDS-M
+(backed by `hb-rate-limit`) configured from each adapter's `rate_limits` (Binance: 2400 weight/min, per the Binance USDS-M
 Futures docs). To share a budget with the host, inject any object satisfying `ThrottlerProtocol`
 (for example hummingbot's `AsyncThrottler`, configured with the adapter's limit ids) via
 `LiquidationsFeed(..., throttler=...)`. A custom `network_client` owns its own rate limiting.
