@@ -6,8 +6,8 @@ requires-python = ">=3.12"
 license = {text = "Apache-2.0"}
 dependencies = [
     "aiohttp>=3.8.0",
-    "hb-logger @ git+https://github.com/MementoRC/hb-logger.git@06534b7708a13b4425a06dd154976db96c2c45be",
-    "hb-rate-limit @ git+https://github.com/MementoRC/hb-rate-limit.git@v0.3.0",
+    "hb-logger @ git+https://github.com/MementoRC/hb-logger.git@v0.1.0",
+    "hb-rate-limit @ git+https://github.com/MementoRC/hb-rate-limit.git@v0.5.0",
     "pandas>=1.0.0",
     "pydantic>=2.12.5",
 ]
