@@ -44,7 +44,7 @@ pytest-timeout = ">=2.1.0"
 pytest-xdist = ">=3.0.0"
 ruff = "=0.15.10"
 mypy = ">=1.5.1"
-aioresponses = "*"
+aioresponses = ">=0.7.8"
 
 [tool.pixi.feature.ci.dependencies]
 ruff = "=0.15.10"
