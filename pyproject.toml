@@ -91,7 +91,7 @@ format-check = "ruff format --check liquidations_feed tests"
 typecheck = "mypy liquidations_feed"
 type-check = "mypy liquidations_feed"
 security = "bandit -c pyproject.toml -r liquidations_feed/"
-quality = { depends-on = ["lint", "format-check"] }
+quality = { depends-on = ["lint", "format-check", "typecheck"] }
 check = { depends-on = ["quality", "test"] }
 
 [tool.ruff]
