@@ -25,6 +25,7 @@ jobs:
       checks: write
     secrets: inherit
     with:
+      codeql: true
       pixi-environment: "ci"
       python-versions: '["3.12"]'
       os-matrix: '["ubuntu-latest"]'
