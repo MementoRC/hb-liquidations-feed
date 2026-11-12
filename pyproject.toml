@@ -47,12 +47,14 @@ pytest-timeout = ">=2.1.0"
 pytest-xdist = ">=3.0.0"
 ruff = "=0.17.2"
 mypy = ">=1.5.1"
+import-linter = ">=2.0"
 aioresponses = "*"
 pre-commit = ">=2.15.0"
 
 [tool.pixi.feature.ci.dependencies]
 ruff = "=0.17.2"
 mypy = ">=1.5.1"
+import-linter = ">=2.0"
 pytest =">=7.0.0"
 pytest-cov = ">=4.1.0"
 bandit = ">=1.8.0"
@@ -96,7 +98,8 @@ typecheck = "mypy liquidations_feed"
 type-check = "mypy liquidations_feed"
 security = "bandit -c pyproject.toml -r liquidations_feed/"
 check-conda-first = "python scripts/check_conda_first.py"
-quality = { depends-on = ["check-conda-first", "lint", "format-check", "typecheck"] }
+lint-boundaries = "lint-imports"
+quality = { depends-on = ["check-conda-first", "lint", "format-check", "typecheck", "lint-boundaries"] }
 check = { depends-on = ["check-conda-first", "quality", "test"] }
 
 [tool.ruff]
@@ -133,6 +136,16 @@ known-first-party = ["liquidations_feed"]
 
 [tool.ruff.lint.flake8-quotes]
 docstring-quotes = "double"
+
+[tool.importlinter]
+root_package = "liquidations_feed"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "liquidations_feed never imports hummingbot (ADR 0001)"
+type = "forbidden"
+source_modules = ["liquidations_feed"]
+forbidden_modules = ["hummingbot"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
