@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
+import data_type_primitives
 import pytest
 from aioresponses import aioresponses
 
@@ -153,6 +154,15 @@ async def test_compat_check_network_not_connected_on_failure():
     client.rest_get.side_effect = TimeoutError()
     base = LiquidationsBase(_feed_with_client(client))
     assert await base.check_network() is NetworkStatus.NOT_CONNECTED
+
+
+def test_network_status_is_canonical_enum():
+    assert NetworkStatus is data_type_primitives.NetworkStatus
+
+
+async def test_compat_check_network_returns_canonical_member():
+    base = LiquidationsBase(_feed_with_client(AsyncMock()))
+    assert await base.check_network() is data_type_primitives.NetworkStatus.CONNECTED
 
 
 def test_network_status_matches_hummingbot_values():
