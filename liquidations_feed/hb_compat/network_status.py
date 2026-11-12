@@ -1,9 +1,8 @@
-"""``NetworkStatus`` with the same names and values as hummingbot's enum (no hummingbot import)."""
+"""Re-export of the canonical L0 ``NetworkStatus`` enum from hb-data-type-primitives.
 
-from enum import Enum
+Sharing the same class keeps enum identity shared with the parent once it is wired.
+"""
 
+from data_type_primitives import NetworkStatus
 
-class NetworkStatus(Enum):
-    STOPPED = 0
-    NOT_CONNECTED = 1
-    CONNECTED = 2
+__all__ = ["NetworkStatus"]

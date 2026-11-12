@@ -36,6 +36,7 @@ Futures docs). To share a budget with the host, inject any object satisfying `Th
 `await feed.check_network()` pings the exchange (`GET /fapi/v1/ping` for Binance) and returns a
 bool. The `hb_compat` `LiquidationsBase.check_network()` returns `NetworkStatus.CONNECTED` or
 `NetworkStatus.NOT_CONNECTED` and never raises on network failure (cancellation propagates).
+`NetworkStatus` re-exports the canonical enum from hb-data-type-primitives.
 
 ## Installation
 
