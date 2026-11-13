@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, MagicMock
 import aiohttp
 import data_type_primitives
 import pytest
-from aioresponses import aioresponses
 
 from liquidations_feed.adapters.binance import BinancePerpetualAdapter, constants
 from liquidations_feed.core.liquidations_feed import LiquidationsFeed
@@ -16,7 +15,8 @@ from liquidations_feed.core.protocols import ThrottlerProtocol
 from liquidations_feed.core.throttler import AsyncThrottler
 from liquidations_feed.hb_compat import LiquidationsBase, NetworkStatus
 
-PING_URL = f"{constants.REST_URL}{constants.HEALTH_CHECK_ENDPOINT}"
+PING_PATH = constants.HEALTH_CHECK_ENDPOINT
+PING_URL = f"{constants.REST_URL}{PING_PATH}"
 
 
 class RecordingThrottler:
@@ -48,33 +48,44 @@ class _NullContext:
         return None
 
 
-async def test_rest_get_uses_throttler_when_limit_id_given():
+async def test_rest_get_uses_throttler_when_limit_id_given(serve_get):
+    serve_get.add(PING_PATH, payload={})
     throttler = RecordingThrottler()
     client = NetworkClient(throttler=throttler)
-    with aioresponses() as mocked:
-        mocked.get(PING_URL, payload={})
-        await client.rest_get(PING_URL, limit_id="ping")
+    await client.rest_get(serve_get.url + PING_PATH, limit_id="ping")
     await client.close()
     assert throttler.calls == ["ping"]
+    assert serve_get.requests == [PING_PATH]
 
 
-async def test_rest_get_without_limit_id_is_not_throttled():
+async def test_rest_get_without_limit_id_is_not_throttled(serve_get):
+    serve_get.add(PING_PATH, payload={})
     throttler = RecordingThrottler()
     client = NetworkClient(throttler=throttler)
-    with aioresponses() as mocked:
-        mocked.get(PING_URL, payload={})
-        await client.rest_get(PING_URL)
+    await client.rest_get(serve_get.url + PING_PATH)
     await client.close()
     assert throttler.calls == []
+    assert serve_get.requests == [PING_PATH]
 
 
-async def test_rest_get_raises_on_http_error_status():
+async def test_rest_get_raises_on_http_error_status(serve_get):
+    serve_get.add(PING_PATH, status=429, payload={"code": -1003})
     client = NetworkClient()
-    with aioresponses() as mocked:
-        mocked.get(PING_URL, status=429, payload={"code": -1003})
+    try:
         with pytest.raises(aiohttp.ClientResponseError):
-            await client.rest_get(PING_URL)
-    await client.close()
+            await client.rest_get(serve_get.url + PING_PATH)
+    finally:
+        await client.close()
+
+
+async def test_rest_get_raises_on_connection_failure(serve_get):
+    serve_get.add(PING_PATH, disconnect=True)
+    client = NetworkClient()
+    try:
+        with pytest.raises(aiohttp.ClientError):
+            await client.rest_get(serve_get.url + PING_PATH)
+    finally:
+        await client.close()
 
 
 async def test_exchange_info_fetch_is_throttled_under_its_endpoint_id():
@@ -114,15 +125,22 @@ async def test_feed_check_network_pings_health_endpoint_with_limit_id():
     client.rest_get.assert_awaited_once_with(PING_URL, limit_id="v1/ping")
 
 
-async def test_hummingbot_shaped_throttler_satisfies_protocol_and_gets_ping_id():
+async def test_hummingbot_shaped_throttler_satisfies_protocol_and_gets_ping_id(
+    serve_get, monkeypatch
+):
+    serve_get.add(PING_PATH, payload={})
+    monkeypatch.setattr(
+        BinancePerpetualAdapter,
+        "health_check_url",
+        property(lambda self: serve_get.url + constants.HEALTH_CHECK_ENDPOINT),
+    )
     throttler = HummingbotShapedThrottler()
     assert isinstance(throttler, ThrottlerProtocol)
     feed = LiquidationsFeed(adapter=BinancePerpetualAdapter(), throttler=throttler)
-    with aioresponses() as mocked:
-        mocked.get(PING_URL, payload={})
-        assert await feed.check_network() is True
+    assert await feed.check_network() is True
     await feed.stop()
     assert throttler.calls == ["v1/ping"]
+    assert serve_get.requests == [PING_PATH]
 
 
 async def test_feed_check_network_false_on_failure():
